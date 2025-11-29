@@ -1,0 +1,32 @@
+/**
+ * Sequelize model factory for `Attendance` (PostgreSQL)
+ * Usage: const Attendance = require('./models/attendance')(sequelize, DataTypes);
+ */
+module.exports = (sequelize, DataTypes) => {
+	const Attendance = sequelize.define('Attendance', {
+		id: {
+			type: DataTypes.UUID,
+			defaultValue: DataTypes.UUIDV4,
+			primaryKey: true,
+		},
+		userId: {
+			type: DataTypes.UUID,
+			allowNull: false,
+			references: { model: 'users', key: 'id' },
+		},
+		date: { type: DataTypes.DATEONLY, allowNull: false },
+		checkInTime: { type: DataTypes.DATE },
+		checkOutTime: { type: DataTypes.DATE },
+		status: { type: DataTypes.ENUM('present', 'absent', 'late', 'half-day'), allowNull: false, defaultValue: 'present' },
+		totalHours: { type: DataTypes.FLOAT, defaultValue: 0 },
+	}, {
+		tableName: 'attendances',
+		timestamps: true,
+		underscored: true,
+		indexes: [
+			{ unique: true, fields: ['user_id', 'date'] }
+		]
+	});
+
+	return Attendance;
+};
