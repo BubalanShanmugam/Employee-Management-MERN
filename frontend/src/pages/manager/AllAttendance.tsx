@@ -6,6 +6,7 @@ import { Attendance } from '../../types';
 interface AttendanceRecord extends Attendance {
   employeeName?: string;
   employeeEmail?: string;
+  department?: string;
 }
 
 export default function AllAttendance() {

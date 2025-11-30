@@ -32,17 +32,18 @@ export default function AttendanceHistory() {
       const startDate = new Date(year, month, 1);
       const endDate = new Date(year, month + 1, 0);
 
-      const data = await api.getMyHistory(
-        startDate.toISOString().split('T')[0],
-        endDate.toISOString().split('T')[0]
-      );
+      const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+      const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+
+      const data = await api.getMyHistory(startStr, endStr);
 
       setAttendanceData(data);
 
       // Create a map for quick lookup
       const map: AttendanceMap = {};
       data.forEach((record) => {
-        const dateStr = new Date(record.date).toISOString().split('T')[0];
+        const dateObj = new Date(record.date);
+        const dateStr = dateObj.toISOString().substring(0, 10);
         map[dateStr] = record;
       });
       setAttendanceMap(map);

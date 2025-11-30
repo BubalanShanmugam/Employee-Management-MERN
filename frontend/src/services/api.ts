@@ -51,8 +51,10 @@ class ApiService {
     return response.data;
   }
 
-  async getMyHistory(period?: string) {
-    const params = period ? { period } : {};
+  async getMyHistory(startDate?: string, endDate?: string) {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
     const response = await this.client.get('/attendance/my-history', { params });
     return response.data;
   }
