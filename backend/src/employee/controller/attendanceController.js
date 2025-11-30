@@ -191,6 +191,46 @@ async function todayStatus(req, res) {
   }
 }
 
+// Export CSV for manager: supports same filters as allAttendances
+async function exportCsv(req, res) {
+  try {
+    const { start, end } = rangeFromQuery(req.query);
+    const where = { date: { [Op.between]: [start, end] } };
+    if (req.query.department) where['$User.department$'] = req.query.department;
+
+    const rows = await models.Attendance.findAll({ where, include: [{ model: models.User, attributes: ['employeeId', 'name', 'department', 'email'] }], order: [['date', 'DESC']] });
+
+    // Build CSV
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance_${Date.now()}.csv"`);
+
+    // CSV header
+    res.write('date,employeeId,name,email,department,checkInTime,checkOutTime,status,totalHours\n');
+
+    for (const r of rows) {
+      const d = r.date ? new Date(r.date).toISOString().slice(0,10) : '';
+      const emp = r.User || {};
+      const line = [
+        d,
+        (emp.employeeId || ''),
+        (emp.name || '').replace(/\"/g, '"'),
+        (emp.email || ''),
+        (emp.department || ''),
+        r.checkInTime ? new Date(r.checkInTime).toISOString() : '',
+        r.checkOutTime ? new Date(r.checkOutTime).toISOString() : '',
+        r.status || '',
+        r.totalHours || 0,
+      ].map(v => typeof v === 'string' ? `"${String(v).replace(/"/g, '""')}"` : `"${v}"`).join(',');
+      res.write(line + '\n');
+    }
+
+    res.end();
+  } catch (err) {
+    console.error('CSV export failed', err);
+    return res.status(500).json({ message: 'Server error exporting CSV' });
+  }
+}
+
 module.exports = {
   checkin,
   checkout,
@@ -201,4 +241,5 @@ module.exports = {
   employeeAttendances,
   teamSummary,
   todayStatus,
+  exportCsv,
 };
