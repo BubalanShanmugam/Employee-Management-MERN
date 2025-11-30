@@ -1,7 +1,11 @@
+// Load environment variables first (from parent directory where .env is located)
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const { sequelize } = require('./db');
+const { supabase, testConnection } = require('./db');
 
 const app = express();
 app.use(cors());
@@ -12,6 +16,29 @@ app.use('/api/auth', require('./authenticator/router'));
 app.use('/api/attendance', require('./employee/router/attendanceRouter'));
 app.use('/api/attendance', require('./manager/router/attendanceRouter'));
 app.use('/api/dashboard', require('./dashboard/router'));
+
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+  try {
+    const connected = await testConnection();
+    if (connected) {
+      res.json({ 
+        status: 'ok', 
+        database: 'connected',
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      throw new Error('Database connection failed');
+    }
+  } catch (err) {
+    res.status(503).json({ 
+      status: 'error', 
+      database: 'disconnected',
+      message: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // If DB is unavailable, quickly respond 503 for API routes to avoid throwing DB exceptions
 app.use((req, res, next) => {
@@ -26,8 +53,10 @@ const PORT = process.env.PORT || 3000;
 
 async function start() {
   try {
-    await sequelize.sync();
-    app.locals.dbConnected = true;
+    // Test Supabase connection
+    const connected = await testConnection();
+    app.locals.dbConnected = connected;
+    
     const server = app.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
 
     // Graceful shutdown handlers
@@ -36,20 +65,13 @@ async function start() {
     });
     process.on('uncaughtException', (err) => {
       console.error('Uncaught Exception:', err);
-      // In production you might want to exit the process
     });
 
-    // Export server for tests if needed
     app.locals.server = server;
   } catch (err) {
-    // Log DB startup error but do NOT crash the application.
-    // Mark DB as disconnected so middleware can respond appropriately.
-    console.error('Database startup error (continuing without DB):', err && err.stack ? err.stack : err);
+    console.error('Server startup error:', err && err.stack ? err.stack : err);
     app.locals.dbConnected = false;
-    // Start server anyway so health-check endpoints and other non-DB routes remain available.
     const server = app.listen(PORT, () => console.log(`Server listening (DB unavailable) on http://localhost:${PORT}`));
-
-    // Export server for tests if needed
     app.locals.server = server;
   }
 }

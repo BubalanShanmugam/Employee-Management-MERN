@@ -1,6 +1,9 @@
 /**
  * Sequelize model factory for `Attendance` (PostgreSQL)
  * Usage: const Attendance = require('./models/attendance')(sequelize, DataTypes);
+ * 
+ * Updated: Supports multiple check-in/check-out sessions per day
+ * Each session is a separate record with a sessionNumber
  */
 module.exports = (sequelize, DataTypes) => {
 	const Attendance = sequelize.define('Attendance', {
@@ -15,6 +18,12 @@ module.exports = (sequelize, DataTypes) => {
 			references: { model: 'users', key: 'id' },
 		},
 		date: { type: DataTypes.DATEONLY, allowNull: false },
+		sessionNumber: { 
+			type: DataTypes.INTEGER, 
+			allowNull: false, 
+			defaultValue: 1,
+			comment: 'Session number for the day (1, 2, 3, etc.)'
+		},
 		checkInTime: { type: DataTypes.DATE },
 		checkOutTime: { type: DataTypes.DATE },
 		status: { type: DataTypes.ENUM('present', 'absent', 'late', 'half-day'), allowNull: false, defaultValue: 'present' },
@@ -24,7 +33,7 @@ module.exports = (sequelize, DataTypes) => {
 		timestamps: true,
 		underscored: true,
 		indexes: [
-			{ unique: true, fields: ['user_id', 'date'] }
+			{ unique: true, fields: ['user_id', 'date', 'session_number'] }
 		]
 	});
 

@@ -10,5 +10,6 @@ router.post('/checkout', authenticate, asyncHandler(controller.checkout));
 router.get('/my-history', authenticate, asyncHandler(controller.myHistory));
 router.get('/my-summary', authenticate, asyncHandler(controller.mySummary));
 router.get('/today', authenticate, asyncHandler(controller.today));
+router.get('/last-7-days', authenticate, asyncHandler(controller.last7Days));
 
 module.exports = router;

@@ -20,10 +20,9 @@ interface PrivateRouteProps {
 const PrivateRoute = ({ children, allowedRole }: PrivateRouteProps) => {
   const { user, token } = useAuth();
 
-  if (!token) return <Navigate to="/login" />;
+  if (!token) return <Navigate to="/login" replace />;
   if (allowedRole && user?.role !== allowedRole) {
-    // Redirect to their own dashboard instead of login
-    return <Navigate to={user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard'} />;
+    return <Navigate to={user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard'} replace />;
   }
 
   return <>{children}</>;
@@ -37,14 +36,14 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* Root redirect - if logged in, go to appropriate dashboard */}
+      {/* Root redirect */}
       <Route 
         path="/" 
         element={
           token ? (
-            <Navigate to={user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard'} />
+            <Navigate to={user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard'} replace />
           ) : (
-            <Navigate to="/login" />
+            <Navigate to="/login" replace />
           )
         } 
       />
@@ -117,15 +116,15 @@ function AppRoutes() {
         }
       />
 
-      {/* Fallback - redirect unknown routes to home */}
-      <Route path="*" element={<Navigate to="/" />} />
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
 function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>

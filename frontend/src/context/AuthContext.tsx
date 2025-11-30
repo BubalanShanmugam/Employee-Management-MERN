@@ -49,15 +49,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       await api.register({ name, email, password, employeeId, department, role });
-      // Auto-login after registration
-      await login(email, password, role);
+      // Registration successful - user will be redirected to login page
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [login]);
+  }, []);
 
   const fetchUser = useCallback(async () => {
     try {

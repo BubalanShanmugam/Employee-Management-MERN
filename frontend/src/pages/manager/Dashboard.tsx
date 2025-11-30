@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Layout from '../../components/Layout';
 import api from '../../services/api';
@@ -13,20 +14,34 @@ interface ManagerStats {
 interface DepartmentData {
   name: string;
   totalHours: number;
+  count: number;
 }
 
-interface TodayStatus {
+interface TodayStatusEmployee {
+  id: string;
   name: string;
-  status: string;
   department: string;
+  status: string;
+  checkInTime?: string;
+  checkOutTime?: string;
 }
 
-interface WeeklyData {
-  day: string;
-  hours: number;
+interface AbsentEmployee {
+  id: string;
+  name: string;
+  department: string;
+  employeeId?: string;
+}
+
+interface LateArrival {
+  id: string;
+  name: string;
+  department: string;
+  checkInTime: string;
 }
 
 export default function ManagerDashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<ManagerStats>({
     totalEmployees: 0,
     presentToday: 0,
@@ -34,8 +49,9 @@ export default function ManagerDashboard() {
     lateToday: 0,
   });
   const [departmentData, setDepartmentData] = useState<DepartmentData[]>([]);
-  const [todayStatus, setTodayStatus] = useState<TodayStatus[]>([]);
-  const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
+  const [todayStatusList, setTodayStatusList] = useState<TodayStatusEmployee[]>([]);
+  const [absentEmployees, setAbsentEmployees] = useState<AbsentEmployee[]>([]);
+  const [lateArrivals, setLateArrivals] = useState<LateArrival[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -46,38 +62,43 @@ export default function ManagerDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError('');
 
-      // Fetch team summary
-      const summary = await api.getTeamSummary();
-      const deptData = summary.byDept || [];
-      setDepartmentData(deptData);
+      const data = await api.getManagerDashboard();
 
-      // Calculate stats
-      const totalEmp = deptData.reduce((sum, d) => sum + (d.count || 0), 0);
       setStats({
-        totalEmployees: totalEmp || 20,
-        presentToday: Math.floor(totalEmp * 0.85),
-        absentToday: Math.floor(totalEmp * 0.05),
-        lateToday: Math.floor(totalEmp * 0.1),
+        totalEmployees: data.totalEmployees || 0,
+        presentToday: data.presentToday || 0,
+        absentToday: data.absentToday || 0,
+        lateToday: data.lateToday || 0,
       });
 
-      // Fetch today's attendance status
-      const today = await api.getTodayTeamStatus();
-      setTodayStatus(today);
+      setDepartmentData(data.departmentData || []);
+      setTodayStatusList(data.todayStatusList || []);
+      setAbsentEmployees(data.absentEmployees || []);
+      setLateArrivals(data.lateArrivals || []);
 
-      // Generate sample weekly data (in real scenario, this would come from backend)
-      const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const weekData = weekDays.map((day) => ({
-        day,
-        hours: Math.floor(Math.random() * 200) + 150,
-      }));
-      setWeeklyData(weekData);
-
-      setError('');
     } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard data');
+      console.error('Manager dashboard error:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const blob = await api.exportCsv();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `attendance_${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      setError(err.message || 'Failed to export CSV');
     }
   };
 
@@ -104,7 +125,7 @@ export default function ManagerDashboard() {
         )}
 
         {/* Key Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-lg shadow p-6">
             <p className="text-gray-600 text-sm font-semibold">Total Employees</p>
             <p className="text-3xl font-bold text-blue-600 mt-2">{stats.totalEmployees}</p>
@@ -130,90 +151,185 @@ export default function ManagerDashboard() {
           </div>
         </div>
 
-        {/* Charts */}
+        {/* Charts and Lists Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Weekly Trend */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Weekly Team Hours</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={weeklyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="hours" stroke="#3b82f6" name="Total Hours" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
           {/* Department-wise Hours */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Department-wise Hours</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={departmentData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="totalHours" fill="#8b5cf6" name="Total Hours" />
-              </BarChart>
-            </ResponsiveContainer>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Department-wise Hours (This Month)</h3>
+            {departmentData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={departmentData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="totalHours" fill="#8b5cf6" name="Total Hours" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                No data available
+              </div>
+            )}
           </div>
+
+          {/* Late Arrivals Today */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Late Arrivals Today</h3>
+            {lateArrivals.length > 0 ? (
+              <div className="overflow-y-auto max-h-72">
+                <table className="w-full">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Employee</th>
+                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Dept</th>
+                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Check-in</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lateArrivals.map((emp, idx) => (
+                      <tr key={idx} className="border-t hover:bg-yellow-50">
+                        <td className="px-4 py-2 text-sm text-gray-800">{emp.name}</td>
+                        <td className="px-4 py-2 text-sm text-gray-600">{emp.department}</td>
+                        <td className="px-4 py-2 text-sm text-yellow-700 font-medium">
+                          {new Date(emp.checkInTime).toLocaleTimeString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-green-600">
+                ✓ No late arrivals today
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Absent Employees */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">
+            Absent Employees Today 
+            <span className="ml-2 text-sm font-normal text-red-600">({absentEmployees.length})</span>
+          </h3>
+          {absentEmployees.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Employee</th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Employee ID</th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Department</th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {absentEmployees.slice(0, 10).map((emp, idx) => (
+                    <tr key={idx} className="border-t hover:bg-red-50">
+                      <td className="px-4 py-3 text-sm text-gray-800">{emp.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{emp.employeeId || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{emp.department}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                          Absent
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {absentEmployees.length > 10 && (
+                <p className="text-sm text-gray-500 mt-2 text-center">
+                  And {absentEmployees.length - 10} more...
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-green-600">
+              ✓ All employees are present today!
+            </div>
+          )}
         </div>
 
         {/* Today's Attendance Status */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4">Today's Attendance Status</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Employee</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Department</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {todayStatus.slice(0, 10).map((employee, idx) => (
-                  <tr key={idx} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-800">{employee.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{employee.department}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-                          employee.status === 'present'
-                            ? 'bg-green-100 text-green-800'
-                            : employee.status === 'late'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {employee.status}
-                      </span>
-                    </td>
+          {todayStatusList.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Employee</th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Department</th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Check-in</th>
+                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Check-out</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {todayStatusList.slice(0, 15).map((employee, idx) => (
+                    <tr key={idx} className="border-t hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-800">{employee.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{employee.department}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
+                            employee.status === 'present'
+                              ? 'bg-green-100 text-green-800'
+                              : employee.status === 'late'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {employee.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {employee.checkInTime ? new Date(employee.checkInTime).toLocaleTimeString() : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {employee.checkOutTime ? new Date(employee.checkOutTime).toLocaleTimeString() : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No attendance records for today yet
+            </div>
+          )}
         </div>
 
         {/* Quick Actions */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <button className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button 
+              onClick={() => navigate('/manager/all-attendance')}
+              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition"
+            >
               📊 All Attendance
             </button>
-            <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition">
+            <button 
+              onClick={() => navigate('/manager/team-calendar')}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition"
+            >
               📅 Team Calendar
             </button>
-            <button className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 px-4 rounded-lg transition">
+            <button 
+              onClick={() => navigate('/manager/reports')}
+              className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 px-4 rounded-lg transition"
+            >
               📈 Reports
             </button>
-            <button className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg transition">
+            <button 
+              onClick={handleExportCsv}
+              className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg transition"
+            >
               📥 Export CSV
             </button>
           </div>

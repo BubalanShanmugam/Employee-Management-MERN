@@ -66,10 +66,10 @@ export default function Register() {
         role
       );
 
-      // Redirect based on role
-      navigate(role === 'manager' ? '/manager/dashboard' : '/employee/dashboard');
+      // Registration successful - redirect to login page
+      navigate('/login', { state: { message: 'Registration successful! Please login with your credentials.' } });
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      setError(err.response?.data?.message || err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

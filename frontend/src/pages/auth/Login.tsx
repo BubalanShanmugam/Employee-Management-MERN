@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, isLoading, error } = useAuth();
   const [role, setRole] = useState<'employee' | 'manager'>('employee');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
+
+  // Get success message from registration redirect
+  const successMessage = location.state?.message || '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +29,13 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-8">
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">Attendance System</h1>
+
+        {/* Success Message from Registration */}
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg text-sm">
+            {successMessage}
+          </div>
+        )}
 
         {/* Role Toggle */}
         <div className="mb-6 flex gap-4">

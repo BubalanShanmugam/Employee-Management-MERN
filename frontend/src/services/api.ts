@@ -69,6 +69,11 @@ class ApiService {
     return response.data.data || response.data;
   }
 
+  async getLast7Days() {
+    const response = await this.client.get('/attendance/last-7-days');
+    return response.data.data || response.data;
+  }
+
   // Manager Attendance
   async getAllAttendances(params?: any) {
     const response = await this.client.get('/attendance/all', { params });
