@@ -21,6 +21,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setUser(null);
+    setError(null);
+  }, []);
+
   const login = useCallback(async (email: string, password: string, role: 'employee' | 'manager') => {
     setIsLoading(true);
     setError(null);
@@ -60,14 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setError('Failed to fetch user');
       logout();
     }
-  }, []);
-
-  const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
-    setError(null);
-  }, []);
+  }, [logout]);
 
   return (
     <AuthContext.Provider value={{ user, token, isLoading, error, login, register, logout, fetchUser }}>
