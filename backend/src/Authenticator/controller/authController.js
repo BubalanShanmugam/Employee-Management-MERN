@@ -28,11 +28,26 @@ async function login(req, res) {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: 'Missing credentials' });
 
+    // Optional: allow frontend to indicate whether user intends to login as employee or manager
+    // Accepts: req.body.loginAs or req.query.loginAs with values 'employee'|'manager'
+    const requestedRole = (req.body && req.body.loginAs) || (req.query && req.query.loginAs) || null;
+
     const user = await models.User.findOne({ where: { email } });
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
+
+    // If caller specified a desired login role, enforce it
+    if (requestedRole) {
+      const normalized = String(requestedRole).toLowerCase();
+      if (normalized === 'employee' && user.role !== 'employee') {
+        return res.status(403).json({ message: 'User is not an employee' });
+      }
+      if (normalized === 'manager' && user.role !== 'manager') {
+        return res.status(403).json({ message: 'User is not a manager' });
+      }
+    }
 
     const payload = { id: user.id, role: user.role };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });

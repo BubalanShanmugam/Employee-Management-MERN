@@ -1,4 +1,4 @@
-const { models } = require('../../db');
+const { models, Sequelize } = require('../../db');
 
 async function employeeStats(req, res) {
   try {
@@ -7,7 +7,7 @@ async function employeeStats(req, res) {
     const now = new Date();
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    const rows = await models.Attendance.findAll({ where: { userId, date: { [models.Sequelize.Op.between]: [first, last] } } });
+    const rows = await models.Attendance.findAll({ where: { userId, date: { [Sequelize.Op.between]: [first, last] } } });
     const totalHours = rows.reduce((s, r) => s + Number(r.totalHours || 0), 0);
     const presentDays = rows.filter(r => r.checkInTime).length;
     return res.status(200).json({ message: 'Employee dashboard', totalHours, presentDays });
@@ -23,7 +23,7 @@ async function managerStats(req, res) {
     const now = new Date();
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    const rows = await models.Attendance.findAll({ where: { date: { [models.Sequelize.Op.between]: [first, last] } }, include: [{ model: models.User, attributes: ['department'] }] });
+    const rows = await models.Attendance.findAll({ where: { date: { [Sequelize.Op.between]: [first, last] } }, include: [{ model: models.User, attributes: ['department'] }] });
     const totalHours = rows.reduce((s, r) => s + Number(r.totalHours || 0), 0);
     const byDept = {};
     rows.forEach(r => {
