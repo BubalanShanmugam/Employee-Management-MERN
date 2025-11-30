@@ -26,7 +26,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Routers
-app.use('/api/auth', require('./authenticator/router'));
+app.use('/api/auth', require('./Authenticator/router'));
 app.use('/api/attendance', require('./employee/router/attendanceRouter'));
 app.use('/api/attendance', require('./manager/router/attendanceRouter'));
 app.use('/api/dashboard', require('./dashboard/router'));
