@@ -9,18 +9,23 @@ type ValuePiece = Date | null;
 type Value = ValuePiece | [ValuePiece, ValuePiece];
 
 interface AttendanceMap {
-  [key: string]: Attendance;
+  [key: string]: Attendance[];
 }
 
 export default function AttendanceHistory() {
   const [date, setDate] = useState<Value>(new Date());
   const [attendanceData, setAttendanceData] = useState<Attendance[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<AttendanceMap>({});
-  const [selectedDate, setSelectedDate] = useState<Attendance | null>(null);
+  const [selectedDateRecords, setSelectedDateRecords] = useState<Attendance[]>([]);
+  const [selectedDateStr, setSelectedDateStr] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
+
+  // Get today's date string for comparison
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
     fetchAttendanceHistory();
@@ -40,17 +45,21 @@ export default function AttendanceHistory() {
 
       setAttendanceData(data);
 
-      // Create a map for quick lookup
+      // Create a map for quick lookup - group by date for multiple sessions
       const map: AttendanceMap = {};
-      data.forEach((record) => {
-        const dateObj = new Date(record.date);
-        const dateStr = dateObj.toISOString().substring(0, 10);
-        map[dateStr] = record;
+      data.forEach((record: Attendance) => {
+        const dateStr = record.date ? record.date.substring(0, 10) : '';
+        if (dateStr) {
+          if (!map[dateStr]) {
+            map[dateStr] = [];
+          }
+          map[dateStr].push(record);
+        }
       });
       setAttendanceMap(map);
       setError('');
     } catch (err: any) {
-      setError(err.message || 'Failed to load attendance history');
+      setError(err.response?.data?.message || err.message || 'Failed to load attendance history');
     } finally {
       setLoading(false);
     }
@@ -71,12 +80,28 @@ export default function AttendanceHistory() {
     }
   };
 
-  const getTileClassName = ({ date: tileDate }: { date: Date }) => {
-    const dateStr = tileDate.toISOString().split('T')[0];
-    const record = attendanceMap[dateStr];
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'present':
+        return 'bg-green-100 text-green-800';
+      case 'absent':
+        return 'bg-red-100 text-red-800';
+      case 'late':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'half-day':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
-    if (record) {
-      return `${getStatusColor(record.status)} text-white font-bold`;
+  const getTileClassName = ({ date: tileDate }: { date: Date }) => {
+    const dateStr = `${tileDate.getFullYear()}-${String(tileDate.getMonth() + 1).padStart(2, '0')}-${String(tileDate.getDate()).padStart(2, '0')}`;
+    const records = attendanceMap[dateStr];
+
+    if (records && records.length > 0) {
+      // Use the first record's status for the tile color
+      return `${getStatusColor(records[0].status)} text-white font-bold`;
     }
     return '';
   };
@@ -84,8 +109,9 @@ export default function AttendanceHistory() {
   const handleDateChange = (value: Value) => {
     if (value instanceof Date) {
       setDate(value);
-      const dateStr = value.toISOString().split('T')[0];
-      setSelectedDate(attendanceMap[dateStr] || null);
+      const dateStr = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+      setSelectedDateStr(dateStr);
+      setSelectedDateRecords(attendanceMap[dateStr] || []);
     }
   };
 
@@ -99,6 +125,11 @@ export default function AttendanceHistory() {
   };
 
   const handleNextMonth = () => {
+    // Don't allow navigating to future months
+    const now = new Date();
+    if (year > now.getFullYear() || (year === now.getFullYear() && month >= now.getMonth())) {
+      return;
+    }
     if (month === 11) {
       setMonth(0);
       setYear(year + 1);
@@ -106,6 +137,15 @@ export default function AttendanceHistory() {
       setMonth(month + 1);
     }
   };
+
+  // Check if selected date is today
+  const isSelectedDateToday = selectedDateStr === todayStr;
+  
+  // Check if selected date is in the past
+  const isSelectedDatePast = selectedDateStr && selectedDateStr < todayStr;
+  
+  // Check if selected date is in the future
+  const isSelectedDateFuture = selectedDateStr && selectedDateStr > todayStr;
 
   if (loading) {
     return (
@@ -148,7 +188,12 @@ export default function AttendanceHistory() {
                 </h3>
                 <button
                   onClick={handleNextMonth}
-                  className="p-2 hover:bg-gray-100 rounded"
+                  disabled={year === today.getFullYear() && month >= today.getMonth()}
+                  className={`p-2 rounded ${
+                    year === today.getFullYear() && month >= today.getMonth()
+                      ? 'text-gray-300 cursor-not-allowed'
+                      : 'hover:bg-gray-100'
+                  }`}
                 >
                   →
                 </button>
@@ -158,6 +203,8 @@ export default function AttendanceHistory() {
                 onChange={handleDateChange}
                 tileClassName={getTileClassName}
                 activeStartDate={new Date(year, month)}
+                maxDate={new Date()} // Disable future dates
+                tileDisabled={({ date: tileDate }) => tileDate > new Date()} // Disable future date tiles
               />
 
               {/* Legend */}
@@ -182,79 +229,154 @@ export default function AttendanceHistory() {
                   </div>
                 </div>
               </div>
+
+              {/* Info Note */}
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  📅 Click on a date to view attendance details. Attendance can only be marked for today.
+                </p>
+              </div>
             </div>
           </div>
 
           {/* Details */}
           <div className="lg:col-span-2">
-            {selectedDate ? (
+            {selectedDateStr ? (
               <div className="bg-white rounded-lg shadow p-6 space-y-4">
-                <h3 className="text-xl font-bold text-gray-800">
-                  {new Date(selectedDate.date).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </h3>
-
-                <div
-                  className={`px-4 py-2 rounded-lg font-semibold inline-block capitalize ${
-                    selectedDate.status === 'present'
-                      ? 'bg-green-100 text-green-800'
-                      : selectedDate.status === 'absent'
-                        ? 'bg-red-100 text-red-800'
-                        : selectedDate.status === 'late'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-orange-100 text-orange-800'
-                  }`}
-                >
-                  {selectedDate.status}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-gray-800">
+                    {new Date(selectedDateStr + 'T00:00:00').toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </h3>
+                  {isSelectedDateToday && (
+                    <span className="px-3 py-1 bg-blue-500 text-white text-sm font-medium rounded-full">
+                      Today
+                    </span>
+                  )}
+                  {isSelectedDatePast && (
+                    <span className="px-3 py-1 bg-gray-400 text-white text-sm font-medium rounded-full">
+                      Past Date (View Only)
+                    </span>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <p className="text-gray-600 text-sm font-semibold">Check-in Time</p>
-                    <p className="text-2xl font-bold text-blue-600 mt-2">
-                      {selectedDate.checkInTime
-                        ? new Date(selectedDate.checkInTime).toLocaleTimeString()
-                        : '-'}
-                    </p>
-                  </div>
+                {selectedDateRecords.length > 0 ? (
+                  <>
+                    {/* Sessions Table */}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="py-2 px-4 text-left text-sm font-semibold text-gray-700">Session</th>
+                            <th className="py-2 px-4 text-left text-sm font-semibold text-gray-700">Check-in</th>
+                            <th className="py-2 px-4 text-left text-sm font-semibold text-gray-700">Check-out</th>
+                            <th className="py-2 px-4 text-left text-sm font-semibold text-gray-700">Hours</th>
+                            <th className="py-2 px-4 text-left text-sm font-semibold text-gray-700">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedDateRecords.map((record, idx) => (
+                            <tr key={record.id || idx} className="border-t border-gray-100">
+                              <td className="py-3 px-4 font-medium">#{(record as any).session_number || (record as any).sessionNumber || idx + 1}</td>
+                              <td className="py-3 px-4">
+                                {(record as any).check_in_time || record.checkInTime
+                                  ? new Date((record as any).check_in_time || record.checkInTime).toLocaleTimeString()
+                                  : '-'}
+                              </td>
+                              <td className="py-3 px-4">
+                                {(record as any).check_out_time || record.checkOutTime
+                                  ? new Date((record as any).check_out_time || record.checkOutTime).toLocaleTimeString()
+                                  : '-'}
+                              </td>
+                              <td className="py-3 px-4">
+                                {((record as any).total_hours || record.totalHours || 0).toFixed(2)} h
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2 py-1 rounded text-xs font-medium capitalize ${getStatusBadgeColor(record.status)}`}>
+                                  {record.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <p className="text-gray-600 text-sm font-semibold">Check-out Time</p>
-                    <p className="text-2xl font-bold text-green-600 mt-2">
-                      {selectedDate.checkOutTime
-                        ? new Date(selectedDate.checkOutTime).toLocaleTimeString()
-                        : '-'}
-                    </p>
-                  </div>
+                    {/* Day Summary */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4 pt-4 border-t">
+                      <div className="bg-blue-50 rounded-lg p-4 text-center">
+                        <p className="text-gray-600 text-sm font-semibold">Total Sessions</p>
+                        <p className="text-2xl font-bold text-blue-600 mt-1">
+                          {selectedDateRecords.length}
+                        </p>
+                      </div>
+                      <div className="bg-purple-50 rounded-lg p-4 text-center">
+                        <p className="text-gray-600 text-sm font-semibold">Total Hours</p>
+                        <p className="text-2xl font-bold text-purple-600 mt-1">
+                          {selectedDateRecords.reduce((sum, r) => sum + ((r as any).total_hours || r.totalHours || 0), 0).toFixed(2)} h
+                        </p>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-4 text-center">
+                        <p className="text-gray-600 text-sm font-semibold">Status</p>
+                        <p className={`text-lg font-bold mt-1 capitalize ${
+                          selectedDateRecords[0].status === 'present' ? 'text-green-600' :
+                          selectedDateRecords[0].status === 'late' ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {selectedDateRecords[0].status}
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="bg-purple-50 rounded-lg p-4">
-                    <p className="text-gray-600 text-sm font-semibold">Total Hours</p>
-                    <p className="text-2xl font-bold text-purple-600 mt-2">
-                      {selectedDate.totalHours ? selectedDate.totalHours.toFixed(2) : '0'} h
-                    </p>
+                    {/* Past Date Notice */}
+                    {isSelectedDatePast && (
+                      <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+                        <p className="text-sm text-gray-600 text-center">
+                          📋 This is a past date. Attendance records are view-only.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    {isSelectedDatePast ? (
+                      <div className="space-y-2">
+                        <p className="text-gray-500 text-lg">No attendance record for this date</p>
+                        <p className="text-sm text-gray-400">You were absent on this day or didn't mark attendance.</p>
+                      </div>
+                    ) : isSelectedDateToday ? (
+                      <div className="space-y-4">
+                        <p className="text-gray-500 text-lg">No attendance marked yet today</p>
+                        <a 
+                          href="/employee/mark-attendance" 
+                          className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition"
+                        >
+                          Mark Attendance Now
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No data available</p>
+                    )}
                   </div>
-
-                  <div className="bg-indigo-50 rounded-lg p-4">
-                    <p className="text-gray-600 text-sm font-semibold">Date</p>
-                    <p className="text-lg font-bold text-indigo-600 mt-2">
-                      {new Date(selectedDate.date).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow p-6 text-center">
-                <p className="text-gray-600">Select a date to view details</p>
+                <div className="py-12">
+                  <p className="text-gray-500 text-lg">👆 Select a date from the calendar to view attendance details</p>
+                </div>
               </div>
             )}
 
             {/* Summary Stats */}
             <div className="bg-white rounded-lg shadow p-6 mt-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">Month Summary</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-4">
+                {new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Summary
+              </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-green-50 rounded p-4 text-center">
                   <p className="text-gray-600 text-sm">Present Days</p>
@@ -285,7 +407,7 @@ export default function AttendanceHistory() {
                 <p className="text-gray-600 text-sm">Total Hours This Month</p>
                 <p className="text-2xl font-bold text-purple-600">
                   {attendanceData
-                    .reduce((sum, a) => sum + (a.totalHours || 0), 0)
+                    .reduce((sum, a) => sum + ((a as any).total_hours || a.totalHours || 0), 0)
                     .toFixed(2)}{' '}
                   h
                 </p>

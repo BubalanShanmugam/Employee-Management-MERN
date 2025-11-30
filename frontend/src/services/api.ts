@@ -14,9 +14,9 @@ class ApiService {
       },
     });
 
-    // Add token to every request if available
+    // Add token to every request if available (using sessionStorage for auto-logout on close)
     this.client.interceptors.request.use((config) => {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }

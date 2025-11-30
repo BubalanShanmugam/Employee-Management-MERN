@@ -17,12 +17,13 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+  // Use sessionStorage - token is automatically cleared when browser/tab is closed
+  const [token, setToken] = useState<string | null>(() => sessionStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     setToken(null);
     setUser(null);
     setError(null);
@@ -33,7 +34,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       const response = await api.login({ email, password, loginAs: role });
-      localStorage.setItem('token', response.token);
+      // Use sessionStorage - automatically logs out when browser/tab is closed
+      sessionStorage.setItem('token', response.token);
       setToken(response.token);
       await fetchUser();
     } catch (err: any) {

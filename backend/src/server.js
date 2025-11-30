@@ -8,8 +8,22 @@ const cors = require('cors');
 const { supabase, testConnection } = require('./db');
 
 const app = express();
-app.use(cors());
+
+// CORS configuration for production
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
+
+// Serve static files from frontend build in production
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.join(__dirname, '..', '..', 'frontend', 'dist');
+  app.use(express.static(frontendPath));
+}
 
 // Routers
 app.use('/api/auth', require('./authenticator/router'));
@@ -81,3 +95,11 @@ start();
 // Mount centralized error handler (placed after routes/mounting above)
 const errorHandler = require('./middleware/errorHandler');
 app.use(errorHandler);
+
+// Serve frontend for all non-API routes in production (SPA support)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    const frontendPath = path.join(__dirname, '..', '..', 'frontend', 'dist', 'index.html');
+    res.sendFile(frontendPath);
+  });
+}
