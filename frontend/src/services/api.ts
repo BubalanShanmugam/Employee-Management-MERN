@@ -53,10 +53,10 @@ class ApiService {
 
   async getMyHistory(startDate?: string, endDate?: string) {
     const params: any = {};
-    if (startDate) params.startDate = startDate;
-    if (endDate) params.endDate = endDate;
+    if (startDate) params.start = startDate;
+    if (endDate) params.end = endDate;
     const response = await this.client.get('/attendance/my-history', { params });
-    return response.data;
+    return response.data.data || response.data;
   }
 
   async getMySummary(period = 'monthly') {
@@ -72,12 +72,12 @@ class ApiService {
   // Manager Attendance
   async getAllAttendances(params?: any) {
     const response = await this.client.get('/attendance/all', { params });
-    return response.data;
+    return response.data.data || response.data;
   }
 
   async getEmployeeAttendances(employeeId: string, params?: any) {
     const response = await this.client.get(`/attendance/employee/${employeeId}`, { params });
-    return response.data;
+    return response.data.data || response.data;
   }
 
   async getTeamSummary(period = 'monthly') {
