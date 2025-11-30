@@ -57,14 +57,14 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        employeeId: formData.employeeId,
-        department: formData.department,
-        role,
-      });
+      await register(
+        formData.name,
+        formData.email,
+        formData.password,
+        formData.employeeId,
+        formData.department,
+        role
+      );
 
       // Redirect based on role
       navigate(role === 'manager' ? '/manager/dashboard' : '/employee/dashboard');
