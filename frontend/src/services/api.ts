@@ -43,12 +43,12 @@ class ApiService {
   // Employee Attendance
   async checkin() {
     const response = await this.client.post('/attendance/checkin');
-    return response.data;
+    return response.data.record || response.data.data || response.data;
   }
 
   async checkout() {
     const response = await this.client.post('/attendance/checkout');
-    return response.data;
+    return response.data.record || response.data.data || response.data;
   }
 
   async getMyHistory(startDate?: string, endDate?: string) {
@@ -61,12 +61,12 @@ class ApiService {
 
   async getMySummary(period = 'monthly') {
     const response = await this.client.get('/attendance/my-summary', { params: { period } });
-    return response.data;
+    return response.data.data || response.data;
   }
 
   async getTodayStatus() {
     const response = await this.client.get('/attendance/today');
-    return response.data;
+    return response.data.data || response.data;
   }
 
   // Manager Attendance
@@ -82,13 +82,13 @@ class ApiService {
 
   async getTeamSummary(period = 'monthly') {
     const response = await this.client.get('/attendance/summary', { params: { period } });
-    return response.data;
+    return response.data.summary || response.data.data || response.data;
   }
 
   async getTodayTeamStatus(department?: string) {
     const params = department ? { department } : {};
     const response = await this.client.get('/attendance/today-status', { params });
-    return response.data;
+    return response.data.present || response.data.data || response.data;
   }
 
   async exportCsv(params?: any): Promise<Blob> {
@@ -102,12 +102,12 @@ class ApiService {
   // Dashboard
   async getEmployeeDashboard() {
     const response = await this.client.get('/dashboard/employee');
-    return response.data;
+    return response.data.data || response.data;
   }
 
   async getManagerDashboard() {
     const response = await this.client.get('/dashboard/manager');
-    return response.data;
+    return response.data.data || response.data;
   }
 }
 
