@@ -21,7 +21,10 @@ const PrivateRoute = ({ children, allowedRole }: PrivateRouteProps) => {
   const { user, token } = useAuth();
 
   if (!token) return <Navigate to="/login" />;
-  if (allowedRole && user?.role !== allowedRole) return <Navigate to="/login" />;
+  if (allowedRole && user?.role !== allowedRole) {
+    // Redirect to their own dashboard instead of login
+    return <Navigate to={user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard'} />;
+  }
 
   return <>{children}</>;
 };
