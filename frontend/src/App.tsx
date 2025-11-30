@@ -27,10 +27,24 @@ const PrivateRoute = ({ children, allowedRole }: PrivateRouteProps) => {
 };
 
 function AppRoutes() {
+  const { user, token } = useAuth();
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+
+      {/* Root redirect - if logged in, go to appropriate dashboard */}
+      <Route 
+        path="/" 
+        element={
+          token ? (
+            <Navigate to={user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard'} />
+          ) : (
+            <Navigate to="/login" />
+          )
+        } 
+      />
 
       {/* Employee Routes */}
       <Route
@@ -100,7 +114,8 @@ function AppRoutes() {
         }
       />
 
-      <Route path="/" element={<Navigate to="/login" />} />
+      {/* Fallback - redirect unknown routes to home */}
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }

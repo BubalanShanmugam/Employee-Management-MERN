@@ -22,7 +22,9 @@ async function checkin(req, res) {
 
     let record = await models.Attendance.findOne({ where: { userId, date: { [Op.between]: [todayStart, todayEnd] } } });
     if (record) {
-      // Already checked in
+      // If already checked out, cannot check in again
+      if (record.checkOutTime) return res.status(400).json({ message: 'Already checked out today, cannot check in again' });
+      // If already checked in, return error
       if (record.checkInTime) return res.status(400).json({ message: 'Already checked in today' });
       record.checkInTime = now;
       record.status = now.getHours() >= 9 ? 'late' : 'present';
