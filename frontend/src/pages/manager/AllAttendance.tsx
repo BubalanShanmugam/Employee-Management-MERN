@@ -37,7 +37,8 @@ export default function AllAttendance() {
   const fetchAttendanceData = async () => {
     try {
       setLoading(true);
-      const data = await api.getAllAttendances();
+      const response = await api.getAllAttendances();
+      const data = Array.isArray(response) ? response : response.data || response;
       setAttendanceData(data);
       setError('');
     } catch (err: any) {

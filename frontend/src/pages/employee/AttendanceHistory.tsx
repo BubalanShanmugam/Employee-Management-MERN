@@ -35,7 +35,8 @@ export default function AttendanceHistory() {
       const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
       const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
 
-      const data = await api.getMyHistory(startStr, endStr);
+      const response = await api.getMyHistory(startStr, endStr);
+      const data = Array.isArray(response) ? response : response.data || response;
 
       setAttendanceData(data);
 

@@ -22,7 +22,8 @@ export default function MarkAttendance() {
   const fetchTodayStatus = async () => {
     try {
       setLoading(true);
-      const data = await api.getTodayStatus();
+      const response = await api.getTodayStatus();
+      const data = response && typeof response === 'object' ? response : null;
       setTodayStatus(data);
       setError('');
     } catch (err: any) {

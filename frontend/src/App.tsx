@@ -21,16 +21,33 @@ const PrivateRoute = ({ children, allowedRole }: PrivateRouteProps) => {
   const { user, token } = useAuth();
 
   if (!token) return <Navigate to="/login" />;
-  if (allowedRole && user?.role !== allowedRole) return <Navigate to="/login" />;
+  if (allowedRole && user?.role !== allowedRole) {
+    // Redirect to their own dashboard instead of login
+    return <Navigate to={user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard'} />;
+  }
 
   return <>{children}</>;
 };
 
 function AppRoutes() {
+  const { user, token } = useAuth();
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+
+      {/* Root redirect - if logged in, go to appropriate dashboard */}
+      <Route 
+        path="/" 
+        element={
+          token ? (
+            <Navigate to={user?.role === 'manager' ? '/manager/dashboard' : '/employee/dashboard'} />
+          ) : (
+            <Navigate to="/login" />
+          )
+        } 
+      />
 
       {/* Employee Routes */}
       <Route
@@ -100,7 +117,8 @@ function AppRoutes() {
         }
       />
 
-      <Route path="/" element={<Navigate to="/login" />} />
+      {/* Fallback - redirect unknown routes to home */}
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }
