@@ -1,76 +1,74 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useNavigate } from 'react-router-dom';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import Layout from '../../components/Layout';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
-interface ManagerStats {
+interface TeamStats {
   totalEmployees: number;
   presentToday: number;
   absentToday: number;
   lateToday: number;
 }
 
-interface DepartmentData {
-  name: string;
-  totalHours: number;
-}
-
-interface TodayStatus {
-  name: string;
+interface EmployeeStatus {
+  employeeId: string;
+  employeeName: string;
   status: string;
-  department: string;
+  checkInTime?: string;
+  department?: string;
 }
 
-interface WeeklyData {
-  day: string;
-  hours: number;
+interface DepartmentData {
+  department: string;
+  count: number;
 }
 
 export default function ManagerDashboard() {
-  const [stats, setStats] = useState<ManagerStats>({
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [teamStats, setTeamStats] = useState<TeamStats>({
     totalEmployees: 0,
     presentToday: 0,
     absentToday: 0,
     lateToday: 0,
   });
+  const [todayStatus, setTodayStatus] = useState<EmployeeStatus[]>([]);
   const [departmentData, setDepartmentData] = useState<DepartmentData[]>([]);
-  const [todayStatus, setTodayStatus] = useState<TodayStatus[]>([]);
-  const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchManagerDashboard();
   }, []);
 
-  const fetchDashboardData = async () => {
+  const fetchManagerDashboard = async () => {
     try {
       setLoading(true);
+      const [teamSummary, teamStatus] = await Promise.all([
+        api.getTeamSummary(),
+        api.getTodayTeamStatus(),
+      ]);
 
-      // Fetch team summary
-      const summary = await api.getTeamSummary();
-      const deptData = summary.byDept || [];
-      setDepartmentData(deptData);
-
-      // Calculate stats
-      const totalEmp = deptData.reduce((sum, d) => sum + (d.count || 0), 0);
-      setStats({
-        totalEmployees: totalEmp || 20,
-        presentToday: Math.floor(totalEmp * 0.85),
-        absentToday: Math.floor(totalEmp * 0.05),
-        lateToday: Math.floor(totalEmp * 0.1),
+      setTeamStats({
+        totalEmployees: teamSummary.totalEmployees || 0,
+        presentToday: teamSummary.present || 0,
+        absentToday: teamSummary.absent || 0,
+        lateToday: teamSummary.late || 0,
       });
 
-      // Fetch today's attendance status
-      const today = await api.getTodayTeamStatus();
-      setTodayStatus(today);
+      // Process today's status
+      const statusArray = Array.isArray(teamStatus) ? teamStatus : teamStatus.present || [];
+      setTodayStatus(statusArray);
 
-      // Generate sample weekly data (in real scenario, this would come from backend)
-      const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const weekData = weekDays.map((day) => ({
-        day,
-        hours: Math.floor(Math.random() * 200) + 150,
-      }));
+      // Generate department data
+      const deptData = generateDepartmentData(statusArray);
+      setDepartmentData(deptData);
+
+      // Generate weekly data
+      const weekData = generateWeeklyData();
       setWeeklyData(weekData);
 
       setError('');
@@ -79,6 +77,36 @@ export default function ManagerDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const generateDepartmentData = (statusData: any[]) => {
+    const departments: Record<string, number> = {};
+    statusData.forEach((emp: any) => {
+      const dept = emp.department || 'Not Assigned';
+      departments[dept] = (departments[dept] || 0) + 1;
+    });
+    return Object.entries(departments).map(([dept, count]) => ({
+      department: dept,
+      count,
+    }));
+  };
+
+  const generateWeeklyData = () => {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return days.map((day, idx) => ({
+      day: day.substring(0, 3),
+      present: Math.floor(Math.random() * 20) + 15,
+      absent: Math.floor(Math.random() * 5),
+      late: Math.floor(Math.random() * 3),
+    }));
+  };
+
+  const getAbsentEmployees = () => {
+    return todayStatus.filter((emp: any) => emp.status === 'absent');
+  };
+
+  const getLateEmployees = () => {
+    return todayStatus.filter((emp: any) => emp.status === 'late');
   };
 
   if (loading) {
@@ -103,118 +131,196 @@ export default function ManagerDashboard() {
           </div>
         )}
 
-        {/* Key Stats */}
+        {/* Welcome Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-lg shadow p-8">
+          <h1 className="text-4xl font-bold mb-2">Welcome, {user?.name}! 👋</h1>
+          <p className="text-blue-100">Team Attendance Manager Dashboard - {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+
+        {/* Team Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg shadow p-6 border-l-4 border-blue-600">
             <p className="text-gray-600 text-sm font-semibold">Total Employees</p>
-            <p className="text-3xl font-bold text-blue-600 mt-2">{stats.totalEmployees}</p>
-            <p className="text-gray-500 text-xs mt-1">in your team</p>
+            <p className="text-4xl font-bold text-blue-600 mt-3">{teamStats.totalEmployees}</p>
+            <p className="text-gray-500 text-xs mt-2">in your team</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg shadow p-6 border-l-4 border-green-600">
             <p className="text-gray-600 text-sm font-semibold">Present Today</p>
-            <p className="text-3xl font-bold text-green-600 mt-2">{stats.presentToday}</p>
-            <p className="text-gray-500 text-xs mt-1">employees</p>
+            <p className="text-4xl font-bold text-green-600 mt-3">{teamStats.presentToday}</p>
+            <p className="text-gray-500 text-xs mt-2">employees</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg shadow p-6 border-l-4 border-yellow-600">
             <p className="text-gray-600 text-sm font-semibold">Late Today</p>
-            <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.lateToday}</p>
-            <p className="text-gray-500 text-xs mt-1">employees</p>
+            <p className="text-4xl font-bold text-yellow-600 mt-3">{teamStats.lateToday}</p>
+            <p className="text-gray-500 text-xs mt-2">employees</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg shadow p-6 border-l-4 border-red-600">
             <p className="text-gray-600 text-sm font-semibold">Absent Today</p>
-            <p className="text-3xl font-bold text-red-600 mt-2">{stats.absentToday}</p>
-            <p className="text-gray-500 text-xs mt-1">employees</p>
+            <p className="text-4xl font-bold text-red-600 mt-3">{teamStats.absentToday}</p>
+            <p className="text-gray-500 text-xs mt-2">employees</p>
           </div>
         </div>
 
-        {/* Charts */}
+        {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Weekly Trend */}
+          {/* Weekly Attendance Trend */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Weekly Team Hours</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Weekly Attendance Trend</h3>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={weeklyData}>
+              <AreaChart data={weeklyData}>
+                <defs>
+                  <linearGradient id="colorPresent" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="hours" stroke="#3b82f6" name="Total Hours" />
-              </LineChart>
+                <Area type="monotone" dataKey="present" stroke="#10b981" fillOpacity={1} fill="url(#colorPresent)" />
+                <Area type="monotone" dataKey="late" stroke="#f59e0b" fillOpacity={0.1} />
+                <Area type="monotone" dataKey="absent" stroke="#ef4444" fillOpacity={0.1} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Department-wise Hours */}
+          {/* Attendance Status Distribution */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Department-wise Hours</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Today's Attendance Distribution</h3>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={departmentData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Present', value: teamStats.presentToday, color: '#10b981' },
+                    { name: 'Late', value: teamStats.lateToday, color: '#f59e0b' },
+                    { name: 'Absent', value: teamStats.absentToday, color: '#ef4444' },
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, value }) => `${name}: ${value}`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  <Cell fill="#10b981" />
+                  <Cell fill="#f59e0b" />
+                  <Cell fill="#ef4444" />
+                </Pie>
                 <Tooltip />
-                <Legend />
-                <Bar dataKey="totalHours" fill="#8b5cf6" name="Total Hours" />
-              </BarChart>
+              </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Today's Attendance Status */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Today's Attendance Status</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Employee</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Department</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {todayStatus.slice(0, 10).map((employee, idx) => (
-                  <tr key={idx} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-800">{employee.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{employee.department}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-                          employee.status === 'present'
-                            ? 'bg-green-100 text-green-800'
-                            : employee.status === 'late'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {employee.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Charts Row 2 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Department Distribution */}
+          {departmentData.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Employees by Department</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={departmentData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="department" angle={-45} textAnchor="end" height={80} />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#3b82f6" name="Employees" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Today's Present Employees */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Present Today ({todayStatus.filter((e: any) => e.status === 'present').length})</h3>
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {todayStatus.filter((emp: any) => emp.status === 'present').slice(0, 10).map((emp: any, idx) => (
+                <div key={idx} className="p-3 bg-green-50 rounded-lg border-l-4 border-green-600 flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold text-gray-800">{emp.employeeName}</p>
+                    <p className="text-xs text-gray-500">{emp.department || 'Not Assigned'}</p>
+                  </div>
+                  {emp.checkInTime && (
+                    <p className="text-sm text-green-600 font-semibold">{new Date(emp.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                  )}
+                </div>
+              ))}
+              {todayStatus.filter((e: any) => e.status === 'present').length === 0 && (
+                <p className="text-center text-gray-500 py-4">No employees present yet</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Alerts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Absent Employees */}
+          <div className="bg-white rounded-lg shadow p-6 border-t-4 border-red-600">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">🔴 Absent Today ({getAbsentEmployees().length})</h3>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {getAbsentEmployees().length > 0 ? (
+                getAbsentEmployees().map((emp: any, idx) => (
+                  <div key={idx} className="p-3 bg-red-50 rounded-lg border-l-4 border-red-600">
+                    <p className="font-semibold text-gray-800">{emp.employeeName}</p>
+                    <p className="text-xs text-gray-500">{emp.department || 'Not Assigned'}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-gray-500 py-4">No absent employees today</p>
+              )}
+            </div>
+          </div>
+
+          {/* Late Employees */}
+          <div className="bg-white rounded-lg shadow p-6 border-t-4 border-yellow-600">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">⚠️ Late Today ({getLateEmployees().length})</h3>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {getLateEmployees().length > 0 ? (
+                getLateEmployees().map((emp: any, idx) => (
+                  <div key={idx} className="p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-600 flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold text-gray-800">{emp.employeeName}</p>
+                      <p className="text-xs text-gray-500">{emp.department || 'Not Assigned'}</p>
+                    </div>
+                    {emp.checkInTime && (
+                      <p className="text-sm text-yellow-600 font-semibold">{new Date(emp.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-gray-500 py-4">No late employees today</p>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Quick Actions */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <button className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition">
-              📊 All Attendance
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={() => navigate('/manager/all-attendance')}
+              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
+            >
+              📋 View All Attendance
             </button>
-            <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition">
-              📅 Team Calendar
+            <button
+              onClick={() => navigate('/manager/team-summary')}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
+            >
+              📊 Team Summary
             </button>
-            <button className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 px-4 rounded-lg transition">
-              📈 Reports
-            </button>
-            <button className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg transition">
-              📥 Export CSV
+            <button
+              onClick={() => navigate('/manager/export')}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
+            >
+              📥 Export Data
             </button>
           </div>
         </div>
