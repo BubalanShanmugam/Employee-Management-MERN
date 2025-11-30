@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controller/attendanceController');
-const { authenticate, authorizeRole } = require('../../authenticator/middleware/authMiddleware');
+const { authenticate, authorizeRole } = require('../../Authenticator/middleware/authMiddleware');
 const asyncHandler = require('../../middleware/asyncHandler');
 
 // Employee endpoints
