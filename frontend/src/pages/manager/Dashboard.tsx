@@ -109,6 +109,22 @@ export default function ManagerDashboard() {
     return todayStatus.filter((emp: any) => emp.status === 'late');
   };
 
+  const handleExportCsv = async () => {
+    try {
+      const blob = await api.exportCsv();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `attendance_${new Date().toISOString().substring(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || 'Failed to export CSV');
+    }
+  };
+
   if (loading) {
     return (
       <Layout role="manager">
@@ -317,10 +333,10 @@ export default function ManagerDashboard() {
               📊 Team Summary
             </button>
             <button
-              onClick={() => navigate('/manager/export')}
+              onClick={handleExportCsv}
               className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
             >
-              📥 Export Data
+              📥 Export CSV
             </button>
           </div>
         </div>
